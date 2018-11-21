@@ -17,7 +17,7 @@ version: "3.6"
 
 services:
 
- poet-engine:
+ poet-engin-1:
      build:
        context: .
        dockerfile: poet-sgx-engine.dockerfile
@@ -30,7 +30,7 @@ services:
      working_dir: '/project/sawtooth-poet/src/core'
      entrypoint: "bash -c \"\
          source /project/sawtooth-poet/build_sgx_binary.sh \
-         && RUST_BACKTRACE=1 cargo build\""
+         && RUST_BACKTRACE=1 cargo build \""
      stop_signal: SIGKILL
 
  validator-registry-tp:

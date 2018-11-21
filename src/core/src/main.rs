@@ -38,6 +38,7 @@ extern crate sgxffi;
 extern crate toml;
 extern crate validator_registry_tp;
 extern crate zmq;
+extern crate hex;
 
 use engine::Poet2Engine;
 use log::LevelFilter;

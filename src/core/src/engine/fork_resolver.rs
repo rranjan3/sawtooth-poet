@@ -14,250 +14,291 @@
  * limitations under the License.
  * ------------------------------------------------------------------------------
  */
-use enclave_sgx::WaitCertificate;
-use engine::consensus_state::*;
+use sawtooth_sdk::consensus::engine::*;
+use service::Poet2Service;
 use engine::consensus_state_store::ConsensusStateStore;
 use poet2_util;
-use sawtooth_sdk::consensus::engine::*;
-use serde_json;
-use service::Poet2Service;
 
-pub fn resolve_fork(
-    service: &mut Poet2Service,
-    state_store: &mut ConsensusStateStore,
-    block_id: BlockId,
-    mut claim_block_dur: u64,
-) -> bool {
-    let block_ = service.get_block(&block_id);
-    let mut published = false;
-    let chain_head = service.get_chain_head();
+#[derive(Debug)]
+pub enum ForkResResult {
+    FailIncomingBlock,
+    CommitIncomingBlock,
+    IgnoreIncomingBlock,
+}
 
-    if block_.is_ok() {
-        let block = block_.unwrap();
+pub struct ForkResolver{
+    claim_block_dur : u64,
+    block_id : BlockId,
+    fork_cc: u64,
+    fork_len: u64,
+    chain_len: u64,
+    chain_cc: u64,
+}
 
-        let prev_block_ = service.get_block(&block.previous_id);
+impl ForkResolver{
+    pub fn new() -> Self {
 
-        info!(
-            "Choosing between chain heads -- current: {:?} -- new: {:?}",
-            chain_head, block
-        );
-
-        // Commiting or Resolving fork if one exists
-        // Advance the chain if possible.
-
-        let new_block_dur = get_cert_from(&block).wait_time;
-
-        if claim_block_dur == 0 {
-            claim_block_dur = new_block_dur;
+        ForkResolver{
+            claim_block_dur : 0_u64,
+            block_id : BlockId::default(),
+            fork_cc: 0_u64,
+            fork_len: 0_u64,
+            chain_len: 0_u64,
+            chain_cc: 0_u64,
         }
-        // Current block points to current head
-        // Check if block already claimed. Go on to
-        // compare duration then. Accept one of them
-        // and update it to be new chain head
-        if block.block_num == (1 + chain_head.block_num) && block.previous_id == chain_head.block_id
-        {
-            debug!(
-                "New block duration {} Claim block duration {}",
-                new_block_dur, claim_block_dur
+    }
+
+    pub fn resolve_fork( &mut self, service: &mut Poet2Service,
+                         state_store: &mut ConsensusStateStore, block_id_: BlockId,
+                         claim_block_dur_: u64 ) -> ForkResResult {
+
+        let mut fork_res_result:ForkResResult = ForkResResult::CommitIncomingBlock;
+        self.claim_block_dur = claim_block_dur_;
+        self.block_id = block_id_;
+        let block_ = service.get_block(&self.block_id);
+        let chain_head = service.get_chain_head();
+        let mut fork_blocks_vec: Vec<Block> = Vec::new();
+
+        if block_.is_ok(){
+
+            let block = block_.unwrap();
+
+            info!(
+                "Choosing between chain heads -- current: {} -- new: {}",
+                poet2_util::format_block(&chain_head),
+                poet2_util::format_block(&block)
             );
-            if new_block_dur <= claim_block_dur {
-                info!("Discarding the block in progress.");
-                service.cancel_block();
-                published = true;
-                info!("New block extends current chain. Committing {:?}", block);
-                let agg_chain_clock = service.get_chain_clock() + new_block_dur;
-                let mut state = ConsensusState::default();
-                state.aggregate_chain_clock = agg_chain_clock;
-                state.estimate_info = EstimateInfo {
-                    population_estimate: 0_f64,
-                    previous_block_id: poet2_util::to_hex_string(&Vec::from(block.previous_id)),
-                    validator_id: poet2_util::to_hex_string(&Vec::from(block.signer_id)),
-                };
-                debug!(
-                    "Storing cummulative cc = {} for blockId : {:?}",
-                    agg_chain_clock,
-                    block_id.clone()
-                );
-                state_store.put(block_id.clone(), state);
-                service.set_chain_clock(agg_chain_clock);
-                service.commit_block(block_id);
-            } else {
-                info!("New block has larger duration. Failing {:?}", block);
-                service.fail_block(block_id);
-            }
-        }
-        // Check if the previous block is strictly in the
-        // cache. If so, look for common ancestor and resolve fork.
-        else if prev_block_.is_ok() {
-            let prev_block = prev_block_.unwrap();
 
-            if state_store.get(prev_block.block_id).is_err() {
-                let mut cache_block = block.clone();
-                let block_state;
-                let mut block_state_;
-                let cc_upto_head = service.get_chain_clock();
-                let mut fork_cc: u64 = new_block_dur;
-                let mut fork_len: u64 = 1;
-                let mut cc_upto_ancestor = 0_u64;
-                let mut ancestor_found: bool = false;
-                info!("Looping over chain to find common ancestor.");
+            // Commiting or Resolving fork if one exists
+            // Advance the chain if possible.
 
-                loop {
-                    let cache_block_ = service.get_block(&cache_block.previous_id);
+            let new_block_dur = poet2_util::get_wait_time_from(&block);
 
-                    // If block's previous not in cache or statestore,
-                    // break from loop and send block to cache
-                    if cache_block_.is_ok() {
-                        cache_block = cache_block_.unwrap();
-                        if cache_block.block_num == 0 {
-                            debug!("Genesis reached while finding common ancestor.");
-                            ancestor_found = true;
-                            break;
-                        }
+            let common_ancestor_ = self.get_common_ancestor( service,
+                chain_head.clone(), block.clone(),
+                &mut fork_blocks_vec, );
+            match common_ancestor_ {
+                Some( common_ancestor ) => {
 
-                        // get cc from certificate in cache_block
-                        let ancestor_cc = get_cert_from(&cache_block).wait_time;
+                    // Received block points to current head
+                    // Go on to compare duration. Accept this block and
+                    // discard candidate block or fail this block.
+                    if common_ancestor.block_id == chain_head.block_id {
 
-                        // Assuming here that we have the consensus state
-                        // for each block that has been committed into the chain.
-                        // Parse blocks from cache & states from the statestore
-                        // to find a common ancestor.
-                        // Keep account of the chainclocks from cache.
-                        // Once common ancestor is found, compare the
-                        // chainclocks of the forks to choose a fork
-                        block_state_ = state_store.get(cache_block.block_id.clone());
-                        if block_state_.is_ok() {
-                            // Found common ancestor
-                            info!("Found a common ancestor at block {:?}", block.clone());
-                            ancestor_found = true;
-                            block_state = block_state_.unwrap();
-                            cc_upto_ancestor = block_state.aggregate_chain_clock;
-                            break;
-                        }
-                        fork_cc += ancestor_cc;
-                        fork_len += 1;
-                    } else {
-                        info!("Not a valid fork.");
-                    }
-                }
-                let mut fork_won = false;
-                let mut chain_cc: u64 = 0;
-                if ancestor_found {
-                    info!("Found a common ancestor. Comparing length.");
-                    debug!(
-                        "Chain clocks upto head = {}, upto common ancestor = {}",
-                        cc_upto_head, cc_upto_ancestor
-                    );
-                    chain_cc = cc_upto_head - cc_upto_ancestor;
-                    let chain_len: u64 = chain_head.block_num - cache_block.block_num;
-                    if chain_len > fork_len {
-                        fork_won = false;
-                    } else if chain_len < fork_len {
-                        fork_won = true;
-                    }
-                    // Fork lengths are equal
-                    else {
-                        if chain_cc == fork_cc {
-                            fork_won = if get_cert_from(&block).duration_id
-                                < get_cert_from(&chain_head).duration_id
-                            {
-                                true
-                            } else {
-                                false
-                            };
+                        debug!("New block duration {} Claim block duration {}",
+                            new_block_dur, self.claim_block_dur);
+                        if new_block_dur <= self.claim_block_dur
+                                || self.claim_block_dur == 0 {
+
+                            info!("New block extends current chain. Committing {}",
+                                poet2_util::format_block(&block));
+                            let agg_chain_clock = service.get_chain_clock() +
+                                new_block_dur;
+                            state_store.add_to_state_store( &block, agg_chain_clock, );
+                            service.set_chain_clock(agg_chain_clock);
+
+                            fork_res_result = ForkResResult::CommitIncomingBlock;
                         } else {
-                            fork_won = if fork_cc < chain_cc { true } else { false };
+                            info!("New block has larger duration. Failing {}",
+                                poet2_util::format_block(&block));
+
+                            fork_res_result = ForkResResult::FailIncomingBlock;
+                        }
+                    } else {
+
+                        let fork_won: bool ;
+                        let cc_upto_head = service.get_chain_clock();
+                        info!("Found a common ancestor. Comparing length.");
+                        let cc_upto_ancestor = if cc_upto_head != 0 {
+                                                   cc_upto_head - self.chain_cc
+                                               } else {
+                                                   0
+                                               };
+                        debug!("Chain clocks upto head = {}, upto common ancestor = {}",
+                            cc_upto_head, cc_upto_ancestor);
+                        if self.chain_len > self.fork_len {
+                            fork_won = false;
+                        }
+                        else if self.chain_len < self.fork_len {
+                            fork_won = true;
+                        }
+                        // Fork lengths are equal
+                        else {
+                            if self.chain_cc == self.fork_cc {
+                                fork_won = if poet2_util::get_cert_from(&block).duration_id
+                                        <  poet2_util::get_cert_from(&chain_head).duration_id
+                                      { true } else { false };
+                            }else {
+                                fork_won = if self.fork_cc < self.chain_cc { true } else { false };
+                            }
+                        }
+                        if fork_won {
+                            info!("Switching to fork.");
+                            // self.fork_cc is inclusive of new block
+                            let agg_chain_clock = cc_upto_ancestor + self.fork_cc;
+                            debug!("Aggregate chain clock upto common ancestor = {}
+                                        Fork chain clock = {}. After switch aggregate = {}",
+                                        cc_upto_ancestor, self.fork_cc, agg_chain_clock);
+                            self.add_states_for_new_fork( state_store, 
+                                &mut fork_blocks_vec, agg_chain_clock );
+                            service.set_chain_clock(agg_chain_clock);
+
+                            fork_res_result = ForkResResult::CommitIncomingBlock;
+                            // Mark all blocks upto common ancestor
+                            // in the chain as invalid.
+                            // Delete states for all blocks not in chain
+                            state_store.delete_states_upto(
+                               common_ancestor.block_id, chain_head.clone().block_id, );
+                        }
+                        else {
+                            info!("Not switching to fork");
+                            fork_res_result = ForkResResult::IgnoreIncomingBlock;
                         }
                     }
-                }
-                if fork_won {
-                    info!("Discarding the block in progress.");
-                    service.cancel_block();
-                    published = true;
-                    info!("Switching to fork.");
-                    // fork_cc is inclusive of new block
-                    let agg_chain_clock = cc_upto_ancestor + fork_cc;
-                    let mut state = ConsensusState::default();
-                    state.aggregate_chain_clock = agg_chain_clock;
-                    debug!(
-                        "Aggregate chain clock upto common ancestor = {}
-                                Fork chain clock = {}. After switch aggregate = {}",
-                        cc_upto_ancestor, fork_cc, agg_chain_clock
-                    );
-                    debug!("Storing cummulative cc = {}", agg_chain_clock);
-                    state.estimate_info = EstimateInfo {
-                        population_estimate: 0_f64,
-                        previous_block_id: poet2_util::to_hex_string(&Vec::from(block.previous_id)),
-                        validator_id: poet2_util::to_hex_string(&Vec::from(block.signer_id)),
-                    };
-                    state_store.put(block_id.clone(), state);
-                    service.set_chain_clock(agg_chain_clock);
-                    service.commit_block(block_id);
-                    // Mark all blocks upto common ancestor
-                    // in the chain as invalid.
-                    // Delete states for all blocks not in chain
-                    let chain_len_to_delete = chain_head.block_num - cache_block.block_num;
-                    delete_states_upto(
-                        cache_block.block_id,
-                        chain_head.clone().block_id,
-                        chain_len_to_delete,
-                        service,
-                        state_store,
-                    );
-                } else {
-                    info!("Not switching to fork");
-                    service.ignore_block(block.block_id.clone());
+                },
+                None => {
+                    fork_res_result = ForkResResult::IgnoreIncomingBlock;
                 }
             }
         }
-    }
-    published
+        fork_res_result
     // Fork Resolution done
-}
+    }
 
-fn delete_states_upto(
-    ancestor: BlockId,
-    head: BlockId,
-    delete_len: u64,
-    service: &mut Poet2Service,
-    state_store: &mut ConsensusStateStore,
-) -> () {
-    let mut next = head;
-    let mut count = 0_u64;
-    loop {
-        if ancestor == next || count >= delete_len {
-            break;
-        }
-        count += 1;
-        let state_ = state_store.get(next.clone());
-        if state_.is_err() {
-            debug!("State not found. Getting block via service.");
-            let block_ = service.get_block(&next);
-            if block_.is_ok() {
-                let block = block_.unwrap();
-                next = block.previous_id;
-                continue;
+    fn get_common_ancestor( &mut self, service : &mut Poet2Service,
+           mut chain_block: Block, mut fork_block: Block,
+           fork_block_vec: &mut Vec<Block>, ) -> Option<Block> {
+
+        // Check if the previous block is not committed to the chain.
+        // If so, look for common ancestor and resolve fork.
+        self.fork_cc = poet2_util::get_wait_time_from(&fork_block);
+        self.fork_len = 1;
+        fork_block_vec.push(fork_block.clone());
+        self.chain_len = 1;
+        self.chain_cc = poet2_util::get_wait_time_from(&chain_block);
+        let ancestor_found: bool;
+        info!("Looping over chain to find common ancestor.");
+
+        if chain_block.block_num > fork_block.block_num {
+            // Keep getting blocks from chain until same height
+            // as the fork is reached.
+            while chain_block.block_num != fork_block.block_num {
+                // Get cc from certificate in chain_block
+                self.chain_cc += poet2_util::get_wait_time_from(&chain_block);
+                self.chain_len += 1;
+                match service.get_block(&chain_block.previous_id) {
+                    Ok( ancestor ) => {
+                        chain_block = ancestor;
+                    }
+                    Err(err) => {
+                        error!("Error getting block from validator {}", err);
+                        break;
+                    }
+                }
             }
-            break;
+        }
+
+        else if chain_block.block_num < fork_block.block_num {
+            // Keep getting blocks from fork until same height
+            // as the chain is reached.
+            while chain_block.block_num != fork_block.block_num {
+                // Keep adding wait times
+                // Get cc from certificate in fork_block
+                self.fork_cc += poet2_util::get_wait_time_from(&fork_block);
+                self.fork_len += 1;
+                match service.get_block(&fork_block.previous_id) {
+                    Ok( ancestor ) => {
+                        fork_block = ancestor;
+                        fork_block_vec.push(fork_block.clone());
+                    }
+                    Err(err) => {
+                        error!("Error getting block from validator {}", err);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Loop over fork and chain to find a common ancestor
+        // Descend to the ancestor/previous block in each
+        // iteration for both the chain & the fork.
+        // If genesis is reached in the process( which is almost
+        // not possible), stop iteration and a completely new
+        // chain is competing for fork resolution.
+        loop {
+
+            let prev_chain_block_id = chain_block.previous_id.clone();
+            let prev_fork_block_id = fork_block.previous_id;
+            if prev_fork_block_id == prev_chain_block_id {
+                // Found common ancestor
+                info!("Found a common ancestor at block_id {}",
+                    poet2_util::to_hex_string(&prev_fork_block_id));
+                ancestor_found = true;
+                break;
+            }
+
+            // Getting previous blocks frm the validator to ascend
+            // up the chain/fork
+            let blocks_map = service
+                .get_blocks(vec![prev_chain_block_id.clone(),
+                             prev_fork_block_id.clone()]);
+            match blocks_map {
+                Err(err) => {
+                    error!("Could not get blocks {}", err);
+                    ancestor_found = false;
+                    break;
+                }
+                Ok(block_map) => {
+                    // Remove from the returned hashmap to get block
+                    chain_block = block_map.get(&prev_chain_block_id)
+                        .expect("Could not extract block from map.").clone();
+                    self.chain_len += 1;
+                    // Get cc from certificate in chain_block
+                    self.chain_cc += poet2_util::get_wait_time_from(&chain_block);
+
+                    match block_map.get(&prev_fork_block_id) {
+
+                         Some(prev_fork_block) => {
+                             debug!("Fork block num {} Chain block num {}",
+                                 prev_fork_block.block_num, chain_block.block_num);
+                             fork_block = prev_fork_block.clone();
+                             if fork_block.block_num == 0 {
+                                 warn!("Genesis reached while finding common ancestor.");
+                                 ancestor_found = true;
+                                 break;
+                             }
+                             // Keep adding wait times
+                             // Get cc from certificate in fork_block
+                             self.fork_cc += poet2_util::get_wait_time_from(&fork_block);
+                             self.fork_len += 1;
+                             fork_block_vec.push(fork_block.clone());
+                         }
+                         None => {
+                             error!("Could not get block for id {}",
+                                 poet2_util::to_hex_string(&prev_fork_block_id));
+                             ancestor_found = false;
+                             break;
+                         }
+                    }
+                }
+            }
+        }
+        if ancestor_found {
+            Some(chain_block)
         } else {
-            debug!("Deleting state for {:?}", next.clone());
-            state_store.delete(next.clone());
-            next = BlockId::from(
-                state_
-                    .unwrap()
-                    .estimate_info
-                    .previous_block_id
-                    .as_bytes()
-                    .to_vec(),
-            );
+            None
         }
     }
-}
 
-fn get_cert_from(block: &Block) -> WaitCertificate {
-    let payload = block.payload.clone();
-    debug!("Extracted payload from block: {:?}", payload.clone());
-    let (wait_certificate, _) = poet2_util::payload_to_wc_and_sig(&payload);
-    debug!("Serialized wait_cert : {:?}", &wait_certificate);
-    serde_json::from_str(&wait_certificate).unwrap()
+    fn add_states_for_new_fork( &mut self, state_store: &mut ConsensusStateStore, 
+           block_vec: &mut Vec<Block>, agg_chain_clock_for_head: u64) {
+        
+        let mut agg_chain_clock = agg_chain_clock_for_head;
+        // block_vec would be having blocks in a sorted order
+        // of decreasing block numbers
+        for block in block_vec {
+            state_store.add_to_state_store( &block, agg_chain_clock, );
+            agg_chain_clock -= poet2_util::get_wait_time_from(&block);
+        }
+    } 
 }

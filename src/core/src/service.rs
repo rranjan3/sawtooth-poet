@@ -63,21 +63,26 @@ impl Poet2Service {
     }
 
     pub fn get_block(&mut self, block_id: &BlockId) -> Result<Block, Error> {
-        debug!("Getting block {:?}", block_id);
-        let blocks = self.service.get_blocks(vec![block_id.clone()]); // clone needed as vector needs ownership
+        debug!("Getting block {}", poet2_util::to_hex_string(&block_id));
+        let blocks = self.service
+            .get_blocks(vec![block_id.clone()]); // clone needed as vector needs ownership
         match blocks {
             Err(err) => {
-                warn!("Could not get a block with id {:?}", block_id);
-                Err(Error::UnknownBlock(format!(
-                    "Block not found for id {:?} {:?}",
-                    block_id, err
-                )))
+                warn!("Could not get a block with id {}",
+                    poet2_util::to_hex_string(&block_id));
+                Err(Error::UnknownBlock(format!("Block not found for id {} {}",
+                    poet2_util::to_hex_string(&block_id), err)))
             }
             Ok(mut block_map) => {
                 //remove from the returned hashmap to get value
-                Ok(block_map.remove(block_id).unwrap())
+                Ok(block_map.remove(block_id).expect("Could not extract block from map."))
             }
         }
+    }
+
+    pub fn get_blocks(&mut self, block_ids: Vec<BlockId>) -> Result<HashMap<BlockId, Block>, Error> {
+        debug!("Getting blocks {:?}", block_ids);
+        self.service.get_blocks(block_ids)
     }
 
     pub fn initialize_block(&mut self, previous_id: Option<BlockId>) {
@@ -110,35 +115,35 @@ impl Poet2Service {
     }
 
     pub fn check_block(&mut self, block_id: BlockId) {
-        debug!("Checking block {:?}", block_id);
+        debug!("Checking block {}", poet2_util::to_hex_string(&block_id));
         self.service
             .check_blocks(vec![block_id])
             .expect("Failed to check block");
     }
 
     pub fn fail_block(&mut self, block_id: BlockId) {
-        debug!("Failing block {:?}", block_id);
+        debug!("Failing block {}", poet2_util::to_hex_string(&block_id));
         self.service
             .fail_block(block_id)
             .expect("Failed to fail block");
     }
 
     pub fn ignore_block(&mut self, block_id: BlockId) {
-        debug!("Ignoring block {:?}", block_id);
+        debug!("Ignoring block {}", poet2_util::to_hex_string(&block_id));
         self.service
             .ignore_block(block_id)
             .expect("Failed to ignore block")
     }
 
     pub fn commit_block(&mut self, block_id: BlockId) {
-        debug!("Committing block {:?}", block_id);
+        debug!("Committing block {}", poet2_util::to_hex_string(&block_id));
         self.service
             .commit_block(block_id)
             .expect("Failed to commit block");
     }
 
     pub fn cancel_block(&mut self) {
-        debug!("Cancelling block");
+        debug!("Cancelling block in progress.");
         //TODO Handle InvalidState better
         match self.service.cancel_block() {
             Ok(_) => {}
@@ -250,16 +255,14 @@ impl Poet2Service {
         chain_head: Block,
         wait_time: u64,
     ) -> String {
-        let (wait_certificate, wait_certificate_sig) = if chain_head.block_num != 0_u64 {
-            // not genesis block
-            poet2_util::payload_to_wc_and_sig(&chain_head.payload)
-        } else {
-            (String::new(), String::new())
-        };
-        info!(
-            "Block id returned is {:?}",
-            poet2_util::to_hex_string(&chain_head.block_id)
-        );
+        let (wait_certificate, wait_certificate_sig) =
+            if chain_head.block_num != 0_u64 { // not genesis block
+                poet2_util::payload_to_wc_and_sig(&chain_head.payload)
+            } else {
+                (String::new(), String::new())
+            };
+        info!("Block id returned is {}",  poet2_util::to_hex_string(&chain_head.block_id));
+
         let (serial_cert, cert_signature) = EnclaveConfig::finalize_wait_certificate(
             self.enclave.enclave_id,
             &wait_certificate,
@@ -343,7 +346,7 @@ impl Poet2Service {
 
 pub fn get_wait_cert_and_signature(block: &Block) -> (String, String) {
     let payload = block.payload.clone();
-    debug!("Extracted payload from block: {:?}", payload);
+    debug!("Extracted payload from block: {}", poet2_util::to_hex_string(&payload));
     let (wait_cert, wait_cert_sign) = poet2_util::payload_to_wc_and_sig(&payload);
 
     (wait_cert, wait_cert_sign)
