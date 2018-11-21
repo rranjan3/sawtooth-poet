@@ -43,6 +43,7 @@ tokio-core = "0.1.17"
 toml = "0.4.8"
 openssl = "0.10.15"
 base64 = "0.10.0"
+hex = "0.3.2"
 
 [package.metadata.deb]
 maintainer = "sawtooth"

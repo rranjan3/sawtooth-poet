@@ -85,8 +85,9 @@ pub fn check_consensus(block: &Block, service: &mut Poet2Service, validator_id: 
     //\\ 8. Compare CC & WC
     let chain_clock = service.get_chain_clock();
     let wall_clock = service.get_wall_clock();
-    let wait_time: u64 = 0; //get_wait_cert_json(String::from_utf8(block.payload).unwrap()).wait_time;
+    let wait_time:u64 = poet2_util::get_wait_time_from(&block);
     if chain_clock + wait_time > wall_clock {
+        debug!("Cumulative chain clock exceeds wall clock.");
         return false;
     }
     true
@@ -99,6 +100,10 @@ fn verify_wait_certificate(
 ) -> bool {
     let prev_block = service.get_block(&block.previous_id).unwrap();
     let verify_status = service.verify_wait_certificate(block, &prev_block, &poet_pub_key);
+    if !verify_status {
+        debug!("Failed Wait Cert verification for block_id : {}",
+                  poet2_util::to_hex_string(&block.block_id));
+    }
     verify_status
 }
 
@@ -154,7 +159,9 @@ fn validator_is_claiming_too_early(block: &Block, service: &mut Poet2Service) ->
     };
     let block_claim_delay = cmp::min(key_block_claim_delay, number_of_validators - 1);
 
-    if total_block_claim_count <= block_claim_delay {
+    if total_block_claim_count <= block_claim_delay
+    {
+        debug!("Passed c-test as not enough blocks on chain.");
         return false;
     }
     // need to use get_block from service expecting block_id to have been stored

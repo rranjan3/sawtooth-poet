@@ -42,6 +42,8 @@ pub mod consensus_state;
 pub mod consensus_state_store;
 pub mod fork_resolver;
 
+use self::fork_resolver::{ForkResolver, ForkResResult};
+
 const MAXIMUM_NONCE_LENGTH: usize = 32;
 const BATCHES_REST_API: &str = "batches";
 
@@ -126,9 +128,6 @@ impl Engine for Poet2Engine {
         // TODO: Refactor service code and avoid cloning enclave object.
         let mut service = Poet2Service::new(service, self.enclave.clone());
 
-        let lmdb_ctx = create_lmdb_context().expect("Failed to create context");
-        let mut state_store = open_statestore(&lmdb_ctx).expect("Failed to create state store");
-
         let mut is_published_at_height = false;
 
         // The time keeper variable which martks the start of timer
@@ -148,15 +147,21 @@ impl Engine for Poet2Engine {
         ));
         let mut claim_wait_time = 0;
 
+        let mut fork_resolver = ForkResolver::new();
+
         let mut poet2_settings_view = Poet2SettingsView::new();
         poet2_settings_view.init(chain_head.block_id.clone(), &mut service);
+
+        let lmdb_ctx = create_lmdb_context()
+            .expect("Failed to create context");
+        let mut state_store = open_statestore(&lmdb_ctx)
+            .expect("Failed to create state store");
 
         service.initialize_block(Some(chain_head.block_id));
 
         // 1. Wait for an incoming message.
-        // 2. Check for exit.
-        // 3. Handle the message.
-        // 4. Check for publishing.
+        // 2. Handle the message.
+        // 3. Check for publishing.
         loop {
             let incoming_message = updates.recv_timeout(Duration::from_millis(10));
             match incoming_message {
@@ -188,26 +193,29 @@ impl Engine for Poet2Engine {
 
                         // When a block has passed validator checks
                         Update::BlockValid(block_id) => {
-                            info!(
-                                "BlockValid :: Checking and resolving fork for block_id : {}",
-                                poet2_util::to_hex_string(&block_id)
-                            );
-                            let new_block_won = fork_resolver::resolve_fork(
-                                &mut service,
-                                &mut state_store,
-                                block_id,
-                                claim_wait_time,
-                            );
-                            if new_block_won {
-                                is_published_at_height = true;
+                            info!("BlockValid :: Checking and resolving fork for block_id : {}",
+                                poet2_util::to_hex_string(&block_id));
+                            let forking_result = fork_resolver.resolve_fork( &mut service, &mut state_store,
+                                                     block_id.clone(), claim_wait_time);
+                            match forking_result {
+                                ForkResResult::CommitIncomingBlock => {
+                                    service.commit_block(block_id);
+                                    is_published_at_height = true;
+                                }
+                                ForkResResult::IgnoreIncomingBlock => {
+                                    service.ignore_block(block_id);
+                                }
+                                ForkResResult::FailIncomingBlock => {
+                                    service.fail_block(block_id);
+                                }
                             }
                         }
 
                         // The chain head was updated, so abandon the
                         // block in progress and start a new one.
                         Update::BlockCommit(new_chain_head_blockid) => {
-                            info!("BlockCommit :: Chain head updated to {}, abandoning block in progress",
-                                  poet2_util::to_hex_string(&new_chain_head_blockid));
+                            info!("BlockCommit :: Chain head updated to {}",
+                                poet2_util::to_hex_string(&new_chain_head_blockid));
 
                             service.cancel_block();
 
