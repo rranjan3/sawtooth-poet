@@ -199,56 +199,14 @@ size_t Poet_GetEnclaveQuoteSize()
     return BASE64_SIZE(g_Enclave.GetQuoteSize());
 } // Poet_GetEnclaveQuoteSize
 
-
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-poet_err_t Poet_GetEpidGroup(
-    char* outEpidGroup,
-    size_t inEpidGroupLength
-    )
-{
-     poet_err_t ret = POET_SUCCESS;
-
-     try {
-        sp::ThrowIfNull(outEpidGroup, "NULL outEpidGroup");
-        sp::ThrowIf<sp::ValueError>(
-           inEpidGroupLength < Poet_GetEpidGroupSize(),
-           "EPID group buffer is too small");
-
-        // Get the EPID group from the enclave and convert it to big endian
-        sgx_epid_group_id_t epidGroup;
-        g_Enclave.GetEpidGroup(epidGroup);
-
-        std::reverse(epidGroup, epidGroup + sizeof(epidGroup));
-
-        // Convert the binary data to a hex string and copy it to the caller's
-        // buffer
-        std::string hexString =
-            sp::BinaryToHexString(epidGroup, sizeof(epidGroup));
-        strncpy_s(
-           outEpidGroup,
-           inEpidGroupLength,
-           hexString.c_str(),
-           hexString.length());
-    } catch (sp::PoetError& e) {
-        Poet_SetLastError(e.what());
-        ret = e.error_code();
-    } catch (std::exception& e) {
-        Poet_SetLastError(e.what());
-        ret = POET_ERR_UNKNOWN;
-    } catch (...) {
-        Poet_SetLastError("Unexpected exception");
-        ret = POET_ERR_UNKNOWN;
-    }
-
-    return ret;
-} // Poet_GetEpidGroup
-
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 poet_err_t Poet_GetEnclaveCharacteristics(
     char* outMrEnclave,
     size_t inMrEnclaveLength,
     char* outEnclaveBasename,
-    size_t inEnclaveBasenameLength
+    size_t inEnclaveBasenameLength,
+    char* outEpidGroup,
+    size_t inEpidGroupLength
     )
 {
     poet_err_t ret = POET_SUCCESS;
@@ -262,15 +220,21 @@ poet_err_t Poet_GetEnclaveCharacteristics(
         sp::ThrowIf<sp::ValueError>(
            inEnclaveBasenameLength < Poet_GetEnclaveBasenameSize(),
            "Enclave basename buffer is too small");
+        sp::ThrowIfNull(outEpidGroup, "NULL outEpidGroup");
+        sp::ThrowIf<sp::ValueError>(
+            inEpidGroupLength < Poet_GetEpidGroupSize(),
+            "Epid group buffer is too small");
 
         // Get the enclave characteristics and then convert the binary data to
         // hex strings and copy them to the caller's buffers.
         sgx_measurement_t enclaveMeasurement;
         sgx_basename_t enclaveBasename;
+        sgx_epid_group_id_t epidGroup;
 
         g_Enclave.GetEnclaveCharacteristics(
             &enclaveMeasurement,
-            &enclaveBasename);            
+            &enclaveBasename,
+            &epidGroup);
 
         std::string hexString =
             sp::BinaryToHexString(
@@ -289,6 +253,18 @@ poet_err_t Poet_GetEnclaveCharacteristics(
         strncpy_s(
            outEnclaveBasename,
            inEnclaveBasenameLength,
+           hexString.c_str(),
+           hexString.length());
+
+        std::reverse(epidGroup, epidGroup + sizeof(epidGroup));
+
+        hexString =
+            sp::BinaryToHexString(
+                epidGroup,
+                sizeof(epidGroup));
+        strncpy_s(
+           outEpidGroup,
+           inEpidGroupLength,
            hexString.c_str(),
            hexString.length());
         

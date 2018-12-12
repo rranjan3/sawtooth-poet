@@ -46,12 +46,10 @@ namespace sawtooth {
                 return this->quoteSize;
             } // GetQuoteSize
 
-            void GetEpidGroup(
-                sgx_epid_group_id_t outEpidGroup
-                );
             void GetEnclaveCharacteristics(
                 sgx_measurement_t* outEnclaveMeasurement,
-                sgx_basename_t* outEnclaveBasename
+                sgx_basename_t* outEnclaveBasename,
+                sgx_epid_group_id_t* outEpidGroup
                 );
             void SetSpid(
                 const std::string& inSpid

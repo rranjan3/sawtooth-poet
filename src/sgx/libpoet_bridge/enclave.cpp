@@ -32,6 +32,7 @@
 #include "zero.h"
 #include "hex_string.h"
 
+
 extern std::string g_enclaveError;
 
 namespace sawtooth {
@@ -109,39 +110,10 @@ namespace sawtooth {
         } // Enclave::Unload
 
         // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-        void Enclave::GetEpidGroup(
-            sgx_epid_group_id_t outEpidGroup
-            )
-        {
-            sgx_ra_msg1_t remoteAttestationMessage1;
-
-            sgx_status_t ret =
-                this->CallSgx(
-                    [this,
-                     &remoteAttestationMessage1] () {
-                    return
-                        sgx_ra_get_msg1(
-                            this->raContext,
-                            this->enclaveId,
-                            sgx_ra_get_ga,
-                            &remoteAttestationMessage1);
-                });
-            ThrowSgxError(
-                ret,
-                "Failed to retrieve remote attestation message (EPID group "
-                "ID)");
-
-            memcpy_s(
-                outEpidGroup,
-                sizeof(sgx_epid_group_id_t),
-                remoteAttestationMessage1.gid,
-                sizeof(sgx_epid_group_id_t));
-        } // Enclave::GetEpidGroup
-
-        // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         void Enclave::GetEnclaveCharacteristics(
             sgx_measurement_t* outEnclaveMeasurement,
-            sgx_basename_t* outEnclaveBasename
+            sgx_basename_t* outEnclaveBasename,
+            sgx_epid_group_id_t* outEpidGroup
             )
         {
             ThrowIfNull(
@@ -150,9 +122,13 @@ namespace sawtooth {
             ThrowIfNull(
                 outEnclaveBasename,
                 "Enclave basename pointer is NULL");
+            ThrowIfNull(
+                outEpidGroup,
+                "Enclave EPID group pointer is NULL");
 
             Zero(outEnclaveMeasurement, sizeof(*outEnclaveMeasurement));
             Zero(outEnclaveBasename, sizeof(*outEnclaveBasename));
+            Zero(outEpidGroup, sizeof(*outEpidGroup));
 
             // We can get the enclave's measurement (i.e., mr_enclave) and
             // basename only by getting a quote.  To do that, we need to first
@@ -229,7 +205,7 @@ namespace sawtooth {
                 "Failed to create linkable quote for enclave report");
             
 
-            // Copy the mr_enclave and basenaeme to the caller's buffers
+            // Copy the mr_enclave, basenaeme and epid-group to the caller's buffers
             memcpy_s(
                 outEnclaveMeasurement,
                 sizeof(*outEnclaveMeasurement),
@@ -240,6 +216,11 @@ namespace sawtooth {
                 sizeof(*outEnclaveBasename),
                 &enclaveQuote->basename,
                 sizeof(*outEnclaveBasename));
+            memcpy_s(
+                outEpidGroup,
+                sizeof(*outEpidGroup),
+                &gid,
+                sizeof(*outEpidGroup));
         } // Enclave::GetEnclaveCharacteristics
 
         // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

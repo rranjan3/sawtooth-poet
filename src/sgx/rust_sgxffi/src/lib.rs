@@ -25,6 +25,7 @@ mod tests {
     use ffi::r_sgx_signup_info_t;
     use ffi::r_sgx_wait_certificate_t;
     use std::os::raw::c_char;
+    use std::ptr;
     use std::str;
 
     #[test]
@@ -36,8 +37,9 @@ mod tests {
     fn init_free_enclave_test() {
         let mut eid: r_sgx_enclave_id_t = r_sgx_enclave_id_t {
             handle: 0,
-            mr_enclave: 0 as *mut c_char,
-            basename: 0 as *mut c_char,
+            mr_enclave: ptr::null_mut(),
+            basename: ptr::null_mut(),
+            epid_group: ptr::null_mut(),
         };
 
         //spid should be a valid UTF-8 string of length 32. create all AAAAA's
@@ -59,8 +61,9 @@ mod tests {
     fn create_wait_certificate_test() {
         let mut eid: r_sgx_enclave_id_t = r_sgx_enclave_id_t {
             handle: 0,
-            mr_enclave: 0 as *mut c_char,
-            basename: 0 as *mut c_char,
+            mr_enclave: ptr::null_mut(),
+            basename: ptr::null_mut(),
+            epid_group: ptr::null_mut(),
         };
 
         //spid should be a valid UTF-8 string of length 32. create all AAAAA's
@@ -72,13 +75,6 @@ mod tests {
 
         let ret =
             ffi::init_enclave(&mut eid, bin_path, spid_str).expect("Failed to initialize enclave");
-        assert_eq!(ret, "Success");
-
-        let mut epid_info: r_sgx_epid_group_t = r_sgx_epid_group_t {
-            epid: 0 as *mut c_char,
-        };
-        let ret = ffi::get_epid_group(&mut eid, &mut epid_info).expect("Failed to get EPID group");
-
         assert_eq!(ret, "Success");
 
         //check if SGX is running in simulator mode
@@ -93,9 +89,9 @@ mod tests {
         let opk_hash_vec = "ABCD";
         let mut signup_info: r_sgx_signup_info_t = r_sgx_signup_info_t {
             handle: 0,
-            poet_public_key: 0 as *mut c_char,
+            poet_public_key: ptr::null_mut(),
             poet_public_key_len: 0,
-            enclave_quote: 0 as *mut c_char,
+            enclave_quote: ptr::null_mut(),
         };
 
         let ret = ffi::create_signup_info(&mut eid, &opk_hash_vec, &mut signup_info)
@@ -118,8 +114,8 @@ mod tests {
 
         let mut wait_cert_info: r_sgx_wait_certificate_t = r_sgx_wait_certificate_t {
             handle: 0,
-            ser_wait_cert: 0 as *mut c_char,
-            ser_wait_cert_sign: 0 as *mut c_char,
+            ser_wait_cert: ptr::null_mut(),
+            ser_wait_cert_sign: ptr::null_mut(),
         };
 
         // initialize wait certificate - to get duration from enclave

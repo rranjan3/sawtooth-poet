@@ -210,13 +210,14 @@ public:
     Poet & operator = (const Poet &) = delete;
 
     virtual ~Poet();
-    std::string get_epid_group();
+
     void set_signature_revocation_list(
         const std::string& signature_revocation_list
         );
 
     std::string mr_enclave;         // hex encoding of the enclave measurement
     std::string basename;           // hex encoding of the basename
+    std::string epid_group;         // hex encoding of enclave epid group
 }; // class Poet
 
 void InitializePoetEnclaveModule();

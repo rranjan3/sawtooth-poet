@@ -59,21 +59,6 @@ pub fn free_enclave(eid: &mut r_sgx_enclave_id_t) -> Result<String, String> {
     }
 }
 
-pub fn get_epid_group(
-    eid: &mut r_sgx_enclave_id_t,
-    epid_group: &mut r_sgx_epid_group_t,
-) -> Result<String, String> {
-    unsafe {
-        let eid_ptr = eid as *mut r_sgx_enclave_id_t;
-        let epid_group_ptr = epid_group as *mut r_sgx_epid_group_t;
-        let epid_status = r_get_epid_group(eid_ptr, epid_group_ptr);
-        match epid_status {
-            R_SUCCESS => Ok("Success".to_string()),
-            R_FAILURE => Err("Get EPID group failed".to_string()),
-        }
-    }
-}
-
 pub fn is_sgx_simulator(
     eid: &mut r_sgx_enclave_id_t,
     sgx_simulator: &mut bool,

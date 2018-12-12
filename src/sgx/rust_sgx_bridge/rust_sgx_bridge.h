@@ -6,6 +6,7 @@
                                         intptr_t handle; \
                                         char *mr_enclave; \
                                         char *basename; \
+                                        char *epid_group; \
                                     } r_##sgxtype;
 
 //MAKE_RUST_SGX_TYPE(sgx_signup_info_t);
@@ -43,9 +44,6 @@ r_error_code_t r_initialize_enclave(r_sgx_enclave_id_t *eid,
                                 const char *enclave_path, const char *spid);
 
 r_error_code_t r_free_enclave(r_sgx_enclave_id_t *eid);
-
-r_error_code_t r_get_epid_group(r_sgx_enclave_id_t *eid,
-                                r_sgx_epid_group_t *epid_group);
 
 r_error_code_t r_is_sgx_simulator(r_sgx_enclave_id_t *eid, bool *sgx_simulator);
 

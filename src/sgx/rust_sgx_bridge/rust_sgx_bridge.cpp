@@ -49,6 +49,7 @@ r_error_code_t r_initialize_enclave(r_sgx_enclave_id_t *eid,
         eid->handle = (intptr_t)poet_enclave_id;
         eid->mr_enclave = (char *)poet_enclave_id->mr_enclave.c_str();
         eid->basename = (char *)poet_enclave_id->basename.c_str();
+        eid->epid_group = (char *)poet_enclave_id->epid_group.c_str();
     } catch( sawtooth::poet::PoetError& e) {
         return R_FAILURE;
     } catch(...) {
@@ -67,32 +68,6 @@ r_error_code_t r_free_enclave(r_sgx_enclave_id_t *eid)
 
     return R_SUCCESS;
 }
-
-r_error_code_t r_get_epid_group(r_sgx_enclave_id_t *eid,
-                                r_sgx_epid_group_t *epid_group) {
-    if (!eid) {
-        return R_FAILURE;
-    }
-    if (!eid->handle) {
-        return R_FAILURE;
-    }
-    StringBuffer epidBuffer(Poet_GetEpidGroupSize());
-    try {
-        poet_err_t ret = Poet_GetEpidGroup(epidBuffer.data(),
-                                           epidBuffer.length);
-        if (ret != POET_SUCCESS) {
-            return R_FAILURE;
-        }
-        
-        epid_group->epid = epidBuffer.data();
-    } catch ( sawtooth::poet::PoetError& e) {
-        return R_FAILURE;
-    } catch (...) {
-        return R_FAILURE;
-    }
-    
-    return R_SUCCESS;
- }
 
 r_error_code_t r_is_sgx_simulator(r_sgx_enclave_id_t *eid,
                                   bool *sgx_simulator) {

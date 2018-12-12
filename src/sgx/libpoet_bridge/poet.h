@@ -80,20 +80,6 @@ extern "C" {
     size_t Poet_GetEnclaveQuoteSize();
 
     /*
-        Returns the EPID group as a Hex(base 16) encoded string.
-
-        outEpidGroup - A pointer to a buffer that upon return will contain the
-            hex encoded EPID group.
-        inEpidGroupLength - The size of the buffer pointed to by outEpidGroup.
-            The value to provide for this parameter may be obtained by calling
-            Poet_GetEpidGroupSize().
-    */
-    poet_err_t Poet_GetEpidGroup(
-        char* outEpidGroup,
-        size_t inEpidGroupLength
-        );
-
-    /*
         Returns characteristics about the enclave that can be used later when
         verifying signup information from other validators,
 
@@ -107,12 +93,19 @@ extern "C" {
         inEnclaveBasenameLength - The size of the buffer pointed to by
             outEnclaveBasename.  The value to provide for this parameter may
             be obtained by calling Poet_GetEnclaveBasenameSize().
+        outEpidGroup - A pointer to a buffer that upon return will contain the
+            hex encoded EPID group.
+        inEpidGroupLength - The size of the buffer pointed to by outEpidGroup.
+            The value to provide for this parameter may be obtained by calling
+            Poet_GetEpidGroupSize().
     */
     poet_err_t Poet_GetEnclaveCharacteristics(
         char* outMrEnclave,
         size_t inMrEnclaveLength,
         char* outEnclaveBasename,
-        size_t inEnclaveBasenameLength
+        size_t inEnclaveBasenameLength,
+        char* outEpidGroup,
+        size_t inEpidGroupLength
         );
 
     /*

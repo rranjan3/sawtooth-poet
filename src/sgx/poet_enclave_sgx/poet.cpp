@@ -48,16 +48,20 @@ Poet::Poet(
 
         StringBuffer mrEnclaveBuffer(Poet_GetEnclaveMeasurementSize());
         StringBuffer basenameBuffer(Poet_GetEnclaveBasenameSize());
+        StringBuffer epidGroupBuffer(Poet_GetEpidGroupSize());
 
         ThrowPoetError(
             Poet_GetEnclaveCharacteristics(
                 mrEnclaveBuffer.data(),
                 mrEnclaveBuffer.length,
                 basenameBuffer.data(),
-                basenameBuffer.length));
+                basenameBuffer.length,
+                epidGroupBuffer.data(),
+                epidGroupBuffer.length));
 
         this->mr_enclave = mrEnclaveBuffer.str();
         this->basename = basenameBuffer.str();
+        this->epid_group = epidGroupBuffer.str();
     } catch(...) {
         MyLog(POET_LOG_INFO, "Enclave initialization failed\n");
         ret = POET_ERR_UNKNOWN;
@@ -84,26 +88,6 @@ Poet* Poet::getInstance(
     }
     return Poet::instance;
 }
-
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-std::string Poet::get_epid_group()
-{
-    StringBuffer epidGroupBuffer(Poet_GetEpidGroupSize());
-    poet_err_t ret = POET_SUCCESS;
-
-    try {
-        ThrowPoetError(
-        Poet_GetEpidGroup(
-            epidGroupBuffer.data(),
-            epidGroupBuffer.length));
-    } catch(...) {
-        MyLog(POET_LOG_INFO, "Exception in get EPID group\n");
-        ret = POET_ERR_UNKNOWN;
-        ThrowPoetError(ret);
-    }
-
-    return std::string(epidGroupBuffer.str());  
-} // Poet::get_epid_group
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 void Poet::set_signature_revocation_list(

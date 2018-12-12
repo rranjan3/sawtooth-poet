@@ -84,6 +84,7 @@ impl EnclaveConfig {
             handle: 0,
             mr_enclave: ptr::null_mut(),
             basename: ptr::null_mut(),
+            epid_group: ptr::null_mut(),
         };
         let signup_info = r_sgx_signup_info_t {
             handle: 0,
@@ -104,6 +105,7 @@ impl EnclaveConfig {
             handle: 0,
             mr_enclave: ptr::null_mut(),
             basename: ptr::null_mut(),
+            epid_group: ptr::null_mut(),
         };
 
         // Always fetch SPID from config file, dummy values are accepted when running in
@@ -128,6 +130,7 @@ impl EnclaveConfig {
         self.enclave_id.handle = eid.handle;
         self.enclave_id.basename = eid.basename;
         self.enclave_id.mr_enclave = eid.mr_enclave;
+        self.enclave_id.epid_group = eid.epid_group;
     }
 
     /// Initialization if running on SGX hardware. Fill up IAS client object parameters from
@@ -307,17 +310,6 @@ impl EnclaveConfig {
         verify_wait_cert_status
     }
 
-    pub fn get_epid_group(&mut self) -> String {
-        let mut eid: r_sgx_enclave_id_t = self.enclave_id;
-        let mut epid_info: r_sgx_epid_group_t = r_sgx_epid_group_t {
-            epid: ptr::null_mut(),
-        };
-        ffi::get_epid_group(&mut eid, &mut epid_info).expect("Failed to get EPID group");
-        let epid = unsafe { ffi::create_string_from_char_ptr(epid_info.epid) };
-        debug!("EPID group = {:?}", epid);
-        epid
-    }
-
     /// Returns boolean, information if POET is run in hardware or simulator mode.
     pub fn check_if_sgx_simulator(&mut self) -> bool {
         let mut eid: r_sgx_enclave_id_t = self.enclave_id;
@@ -349,21 +341,19 @@ impl EnclaveConfig {
     /// Method to update signature revocation list received from IAS. Pass it to enclave. Note
     /// that this method is applicable only when PoET is run in SGX hardware mode.
     pub fn update_sig_rl(&mut self) {
-        //TODO - Change SGX API to get EPID group ID and uncomment the below
-        /*
-            if self.check_if_sgx_simulator() == false {
-                let epid_group = self.get_epid_group();
-                let sig_rl_response =
-                    self.ias_client.get_signature_revocation_list(
-                        Option::from(epid_group.as_str()),
-                        None,
-                    ).expect("Error fetching SigRL");
-                let sig_rl_string = read_body_as_string(sig_rl_response.body)
-                    .expect("Error reading SigRL response as string");
-                debug!("Received SigRl of {} length", sig_rl_string.len());
-                self.set_sig_revocation_list(&sig_rl_string)
-            }
-        */
+        if !self.check_if_sgx_simulator() {
+            let epid_group = unsafe {
+                ffi::create_string_from_char_ptr(self.enclave_id.epid_group as *mut c_char)
+            };
+            let sig_rl_response = self
+                .ias_client
+                .get_signature_revocation_list(Option::from(epid_group.as_str()), None)
+                .expect("Error fetching SigRL");
+            let sig_rl_string = read_body_as_string(sig_rl_response.body)
+                .expect("Error reading SigRL response as string");
+            debug!("Received SigRl of {} length", sig_rl_string.len());
+            self.set_sig_revocation_list(&sig_rl_string)
+        }
     }
 }
 
