@@ -15,7 +15,7 @@
 # ------------------------------------------------------------------------------
 
 #
-# Sawtooth -- PoET SGX Enclave Configuration
+# Sawtooth -- PoET Configuration
 #
 
 # spid is a 32-digit hex string tied to the enclave implementation
@@ -69,3 +69,8 @@ genesis_batch_path = ''
 # engine.
 
 validator_pub_key = '/etc/sawtooth/keys/validator.pub'
+
+# log_dir specifies the directory where the log file must be located
+# Note that the log filename would be poet-consensus.log( not configurable )
+ 
+log_dir = '/var/log/sawtooth-poet'

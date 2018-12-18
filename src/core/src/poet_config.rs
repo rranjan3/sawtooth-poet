@@ -15,7 +15,7 @@
  * ------------------------------------------------------------------------------
  */
 
-/// Structure to read IAS proxy server configuration from toml file
+/// Structure to read PoET configuration from toml file
 #[derive(Debug, Deserialize, Clone)]
 pub struct PoetConfig {
     spid: String,
@@ -28,6 +28,7 @@ pub struct PoetConfig {
     is_genesis_node: bool,
     genesis_batch_path: String,
     validator_pub_key: String,
+    log_dir: String,
 }
 
 impl PoetConfig {
@@ -78,5 +79,9 @@ impl PoetConfig {
 
     pub fn set_genesis_batch_path(&mut self, path: String) {
         self.genesis_batch_path = path;
+    }
+
+    pub fn get_log_dir(&mut self) -> String {
+        return self.log_dir.clone();
     }
 }

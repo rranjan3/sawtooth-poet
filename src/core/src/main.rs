@@ -48,6 +48,7 @@ use log4rs::encode::pattern::PatternEncoder;
 use poet2_util::read_file_as_string;
 use poet_config::PoetConfig;
 use sawtooth_sdk::consensus::zmq_driver::ZmqDriver;
+use std::path::Path;
 use std::process;
 use toml as toml_converter;
 
@@ -94,6 +95,16 @@ fn main() {
         .value_of("connect")
         .unwrap_or("tcp://localhost:5050");
 
+    // Read configuration file, i.e. TOML confiuration file
+    let config_file = matches
+        .value_of("config")
+        .expect("Config file is not input, use -h for information");
+
+    let file_contents = read_file_as_string(config_file);
+
+    let mut config: PoetConfig =
+        toml_converter::from_str(file_contents.as_str()).expect("Error reading toml config file");
+
     let log_level;
     match matches.occurrences_of("verbose") {
         0 => log_level = LevelFilter::Warn,
@@ -112,10 +123,15 @@ fn main() {
         .encoder(Box::new(PatternEncoder::new(
             "{d:22.22} {h({l:5.5})} | {({M}:{L}):30.30} | {m}{n}",
         )))
-        .build("log/debug.log")
+        .build(
+            Path::new(&config.get_log_dir())
+                .join("poet-consensus.log")
+                .to_str()
+                .expect("Failed to get log file path"),
+        )
         .expect("Could not build file appender");
 
-    let config = Config::builder()
+    let log_config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .appender(Appender::builder().build("fileout", Box::new(fileout)))
         .build(
@@ -129,20 +145,14 @@ fn main() {
             process::exit(1);
         });
 
-    log4rs::init_config(config).unwrap_or_else(|err| {
+    log4rs::init_config(log_config).unwrap_or_else(|err| {
         error!("{}", err);
         process::exit(1);
     });
 
-    // read configuration file, i.e. TOML confiuration file
-    let config_file = matches
-        .value_of("config")
-        .expect("Config file is not input, use -h for information");
-
-    let file_contents = read_file_as_string(config_file);
-    info!("Read file contents: {}", file_contents);
-    let mut config: PoetConfig =
-        toml_converter::from_str(file_contents.as_str()).expect("Error reading toml config file");
+    // Logging out the file contents late as
+    // logging start only here
+    debug!("Read file contents: {}", file_contents);
 
     let genesis_arg = matches.value_of("is_genesis");
     if genesis_arg.is_some() {
