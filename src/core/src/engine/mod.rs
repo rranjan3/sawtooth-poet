@@ -15,6 +15,7 @@
  * ------------------------------------------------------------------------------
  */
 
+extern crate common;
 extern crate sawtooth_sdk;
 
 use self::check_consensus as czk;
@@ -42,7 +43,7 @@ pub mod consensus_state;
 pub mod consensus_state_store;
 pub mod fork_resolver;
 
-use self::fork_resolver::{ForkResolver, ForkResResult};
+use self::fork_resolver::{ForkResResult, ForkResolver};
 
 const MAXIMUM_NONCE_LENGTH: usize = 32;
 const BATCHES_REST_API: &str = "batches";
@@ -152,10 +153,8 @@ impl Engine for Poet2Engine {
         let mut poet2_settings_view = Poet2SettingsView::new();
         poet2_settings_view.init(chain_head.block_id.clone(), &mut service);
 
-        let lmdb_ctx = create_lmdb_context()
-            .expect("Failed to create context");
-        let mut state_store = open_statestore(&lmdb_ctx)
-            .expect("Failed to create state store");
+        let lmdb_ctx = create_lmdb_context().expect("Failed to create context");
+        let mut state_store = open_statestore(&lmdb_ctx).expect("Failed to create state store");
 
         service.initialize_block(Some(chain_head.block_id));
 
@@ -193,10 +192,16 @@ impl Engine for Poet2Engine {
 
                         // When a block has passed validator checks
                         Update::BlockValid(block_id) => {
-                            info!("BlockValid :: Checking and resolving fork for block_id : {}",
-                                poet2_util::to_hex_string(&block_id));
-                            let forking_result = fork_resolver.resolve_fork( &mut service, &mut state_store,
-                                                     block_id.clone(), claim_wait_time);
+                            info!(
+                                "BlockValid :: Checking and resolving fork for block_id : {}",
+                                poet2_util::to_hex_string(&block_id)
+                            );
+                            let forking_result = fork_resolver.resolve_fork(
+                                &mut service,
+                                &mut state_store,
+                                block_id.clone(),
+                                claim_wait_time,
+                            );
                             match forking_result {
                                 ForkResResult::CommitIncomingBlock => {
                                     service.commit_block(block_id);
@@ -214,8 +219,10 @@ impl Engine for Poet2Engine {
                         // The chain head was updated, so abandon the
                         // block in progress and start a new one.
                         Update::BlockCommit(new_chain_head_blockid) => {
-                            info!("BlockCommit :: Chain head updated to {}",
-                                poet2_util::to_hex_string(&new_chain_head_blockid));
+                            info!(
+                                "BlockCommit :: Chain head updated to {}",
+                                poet2_util::to_hex_string(&new_chain_head_blockid)
+                            );
 
                             service.cancel_block();
 

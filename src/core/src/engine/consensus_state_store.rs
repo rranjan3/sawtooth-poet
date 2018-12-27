@@ -16,12 +16,12 @@
  */
 
 use bincode::{deserialize, serialize};
-use engine::consensus_state::*;
-use sawtooth_sdk::consensus::engine::{Block,BlockId};
 use database::lmdb::LmdbDatabase;
 use database::DatabaseError;
 use engine::consensus_state::ConsensusState;
+use engine::consensus_state::*;
 use poet2_util;
+use sawtooth_sdk::consensus::engine::{Block, BlockId};
 
 #[derive(Debug)]
 pub enum ConsensusStateStoreError {
@@ -39,18 +39,18 @@ impl<'a> ConsensusStateStore<'a> {
             consensus_state_db: db,
         }
     }
-    pub fn get(&self, block_id: BlockId) -> Result<Box<ConsensusState>, DatabaseError> {
+    pub fn get(&self, block_id: &BlockId) -> Result<Box<ConsensusState>, DatabaseError> {
         let reader = self.consensus_state_db.reader()?;
-        let state = reader.get(&block_id).ok_or_else(|| {
+        let state = reader.get(block_id).ok_or_else(|| {
             DatabaseError::NotFoundError(format!(
                 "State not found for
                 block_id: {}",
-                poet2_util::to_hex_string(&block_id)
+                poet2_util::to_hex_string(block_id)
             ))
         })?;
         debug!(
             "Found state for block_id : {}",
-            poet2_util::to_hex_string(&block_id)
+            poet2_util::to_hex_string(block_id)
         );
         let consensus_state: ConsensusState = deserialize(&state).map_err(|err| {
             DatabaseError::CorruptionError(format!(
@@ -61,7 +61,7 @@ impl<'a> ConsensusStateStore<'a> {
         Ok(Box::new(consensus_state.clone()))
     }
 
-    pub fn delete(&mut self, block_id: &BlockId) -> Result<(), DatabaseError>{
+    pub fn delete(&mut self, block_id: &BlockId) -> Result<(), DatabaseError> {
         let mut writer = self.consensus_state_db.writer()?;
         writer.delete(&Vec::from(block_id.clone()))?;
         writer.commit().expect(&format!(
@@ -96,30 +96,33 @@ impl<'a> ConsensusStateStore<'a> {
         Ok(())
     }
 
-    pub fn add_to_state_store( &mut self, block: &Block,
-                           agg_chain_clock: u64 ) -> () {
-
+    pub fn add_to_state_store(&mut self, block: &Block, agg_chain_clock: u64) -> () {
         let mut state = ConsensusState::default();
         state.aggregate_chain_clock = agg_chain_clock;
-        state.estimate_info = EstimateInfo{
-            population_estimate : 0_f64,
-            previous_block_id   : poet2_util::to_hex_string(&Vec::from(block.previous_id.clone())),
-            validator_id        : poet2_util::to_hex_string(&Vec::from(block.signer_id.clone())),
+        state.estimate_info = EstimateInfo {
+            population_estimate: 0_f64,
+            previous_block_id: poet2_util::to_hex_string(&Vec::from(block.previous_id.clone())),
+            validator_id: poet2_util::to_hex_string(&Vec::from(block.signer_id.clone())),
         };
-        debug!("Storing cumulative cc = {} for blockId : {}",
-            agg_chain_clock, poet2_util::to_hex_string(&block.block_id));
+        debug!(
+            "Storing cumulative cc = {} for blockId : {}",
+            agg_chain_clock,
+            poet2_util::to_hex_string(&block.block_id)
+        );
 
         match self.put(&block.block_id, state) {
-            Ok(_) => {},
-            Err( err ) => {
-                panic!("Could not persist state for block_id : {}. Error : {}",
-                    poet2_util::to_hex_string(&block.block_id), err );
+            Ok(_) => {}
+            Err(err) => {
+                panic!(
+                    "Could not persist state for block_id : {}. Error : {}",
+                    poet2_util::to_hex_string(&block.block_id),
+                    err
+                );
             }
         }
     }
 
-    pub fn delete_states_upto( &mut self, ancestor: BlockId, head: BlockId,) -> ()
-    {
+    pub fn delete_states_upto(&mut self, ancestor: BlockId, head: BlockId) -> () {
         let mut next = head;
         let mut count = 0_u64;
         loop {
@@ -127,17 +130,22 @@ impl<'a> ConsensusStateStore<'a> {
                 break;
             }
             count += 1;
-            let state_ = self.get(next.clone());
+            let state_ = self.get(&next.clone());
             debug!("Deleting state for {}", poet2_util::to_hex_string(&next));
             match self.delete(&next) {
-                Ok(_) => {},
-                Err( err ) => {
-                    panic!("Could not delete state for block_id : {}. Error : {}",
-                        poet2_util::to_hex_string(&next), err );
+                Ok(_) => {}
+                Err(err) => {
+                    panic!(
+                        "Could not delete state for block_id : {}. Error : {}",
+                        poet2_util::to_hex_string(&next),
+                        err
+                    );
                 }
             }
-            let mut state = state_.unwrap();
-            next = BlockId::from(poet2_util::from_hex_string(state.estimate_info.previous_block_id));
+            let state = state_.unwrap();
+            next = BlockId::from(poet2_util::from_hex_string(
+                state.estimate_info.previous_block_id,
+            ));
         }
         debug!("Deleted states for {} blocks.", count);
     }
@@ -241,7 +249,7 @@ mod tests {
 
         // Taking random u8 vector as block_id
         assert!(state_store.get(&BlockId::from(vec![11])).is_err());
-        state_store.put( &BlockId::from(vec![11]), ConsensusState::default() );
+        state_store.put(&BlockId::from(vec![11]), ConsensusState::default());
 
         assert!(state_store.get(&BlockId::from(vec![11])).is_ok());
         //cleanup
@@ -260,11 +268,13 @@ mod tests {
 
         // Taking random u8 vector as block_id
         assert!(state_store.get(&BlockId::from(vec![13])).is_err());
-        state_store.put( &BlockId::from(vec![13]), ConsensusState::default() );
+        state_store.put(&BlockId::from(vec![13]), ConsensusState::default());
 
         assert!(state_store.get(&BlockId::from(vec![13])).is_ok());
-        assert_eq!(*state_store.get(&BlockId::from(vec![13])).unwrap(),
-            ConsensusState::default());
+        assert_eq!(
+            *state_store.get(&BlockId::from(vec![13])).unwrap(),
+            ConsensusState::default()
+        );
         //cleanup
         cleanup_dbfile(&file_name);
     }
@@ -280,15 +290,19 @@ mod tests {
         let mut state_store = ConsensusStateStore::new(statestore_db);
 
         // Taking random u8 vector as block_id
-        state_store.put( &BlockId::from(vec![14]), ConsensusState::default() );
-        state_store.put( &BlockId::from(vec![15]), ConsensusState::default() );
+        state_store.put(&BlockId::from(vec![14]), ConsensusState::default());
+        state_store.put(&BlockId::from(vec![15]), ConsensusState::default());
 
-        assert_eq!(*state_store.get(&BlockId::from(vec![14])).unwrap(),
-            ConsensusState::default());
-        assert_eq!(*state_store.get(&BlockId::from(vec![15])).unwrap(),
-            ConsensusState::default());
+        assert_eq!(
+            *state_store.get(&BlockId::from(vec![14])).unwrap(),
+            ConsensusState::default()
+        );
+        assert_eq!(
+            *state_store.get(&BlockId::from(vec![15])).unwrap(),
+            ConsensusState::default()
+        );
 
-        state_store.delete( &BlockId::from(vec![14]) );
+        state_store.delete(&BlockId::from(vec![14]));
         assert!(state_store.get(&BlockId::from(vec![14])).is_err());
         assert!(state_store.get(&BlockId::from(vec![15])).is_ok());
         //cleanup

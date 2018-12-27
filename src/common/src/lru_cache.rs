@@ -15,7 +15,7 @@
 ------------------------------------------------------------------------------
 */
 
-/// module LruCache, for use by IAS proxy
+/// module LruCache
 use std::{
     borrow::BorrowMut,
     clone::Clone,

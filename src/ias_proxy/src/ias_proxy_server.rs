@@ -15,6 +15,7 @@
 ------------------------------------------------------------------------------
 */
 
+extern crate common;
 extern crate futures;
 extern crate hyper;
 extern crate ias_client;
@@ -32,10 +33,10 @@ use self::ias_client::{
     client_utils::{ClientError, ClientResponse},
     ias_client::IasClient,
 };
+use common::lru_cache::LruCache;
+use common::utils::read_binary_file;
 use ias_proxy_config::IasProxyConfig;
-use lru_cache::LruCache;
 use std::{borrow::Borrow, net::SocketAddr, str::FromStr, sync::Mutex};
-use utils::read_binary_file;
 
 /// type definition for response sent from web server
 type ResponseBox = Box<Future<Item = Response<Body>, Error = Error> + Send>;
