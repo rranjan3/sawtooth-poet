@@ -17,17 +17,17 @@
 
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
+use enclave_sgx::WaitCertificate;
+use hex as hex_codec;
 use openssl::{
     hash::MessageDigest,
     pkey::{PKey, Public},
     sign::Verifier,
 };
 use sawtooth_sdk::consensus::engine::*;
-use enclave_sgx::WaitCertificate;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
-use hex as hex_codec;
 
 const WC_DELIM_CHAR: u8 = b'#' as u8; //0x23
 
@@ -44,24 +44,24 @@ pub fn blockid_to_hex_string(blockid: BlockId) -> String {
     to_hex_string(&blockid_vec)
 }
 
-pub fn format_block( block: &Block ) -> String {
-    format!("{}{}{}{}{}{}{}{}{}",
-                   String::from("Block [ block_num : "),
-                   block.block_num,
-                   String::from(", block_id : "),
-                   to_hex_string(&block.block_id),
-                   String::from(", prev_block_id : "),
-                   to_hex_string(&block.previous_id),
-                   String::from(", peer_id : "),
-                   to_hex_string(&block.signer_id),
-                   String::from(" ] "),
+pub fn format_block(block: &Block) -> String {
+    format!(
+        "{}{}{}{}{}{}{}{}{}",
+        String::from("Block [ block_num : "),
+        block.block_num,
+        String::from(", block_id : "),
+        to_hex_string(&block.block_id),
+        String::from(", prev_block_id : "),
+        to_hex_string(&block.previous_id),
+        String::from(", peer_id : "),
+        to_hex_string(&block.signer_id),
+        String::from(" ] "),
     )
-
 }
 
-pub fn payload_to_wc_and_sig(payload: &Vec<u8>) 
-    -> (String, String) {
-
+pub fn get_cert_and_sig_from(block: &Block) -> (String, String) {
+    let payload = &block.payload;
+    debug!("Extracted payload from block: {}", to_hex_string(&payload));
     let delim_index = payload.iter().position(|&i| i == WC_DELIM_CHAR).unwrap();
     let payload_parts = payload.split_at(delim_index + 1);
     let mut wait_certificate = String::from_utf8(payload_parts.0.to_vec()).unwrap();
@@ -70,31 +70,13 @@ pub fn payload_to_wc_and_sig(payload: &Vec<u8>)
     (wait_certificate, wait_certificate_sig)
 }
 
-pub fn get_cert_from( block: &Block) -> WaitCertificate {
-    let payload = block.payload.clone();
-    debug!("Extracted payload from block: {}",
-            to_hex_string(&payload));
-    let (wait_certificate, _) = payload_to_wc_and_sig(&payload);
-    debug!("Serialized wait_cert : {:?}", &wait_certificate);
-    serde_json::from_str(&wait_certificate).unwrap()
-}
-
-pub fn get_wait_time_from( block: &Block) -> u64 {
-
+pub fn get_wait_time_from(block: &Block) -> u64 {
+    // Handling genesis block where there is no certificate
     if block.block_num == 0 {
-        return 0_64;
+        return 0_u64;
     }
-    let payload = block.payload.clone();
-    debug!("Extracted payload from block: {}",
-            to_hex_string(&payload));
-    let (wait_certificate, _) = payload_to_wc_and_sig(&payload);
-    if wait_certificate.len() == 0 {
-        return 0_u64; // Returning 0 if valid certificate not found in payload
-    }
-    let cert : WaitCertificate  = serde_json::from_str(&wait_certificate).unwrap();
-    cert.wait_time
+    WaitCertificate::from(block).wait_time
 }
-
 
 /// Reads the given file as string
 ///

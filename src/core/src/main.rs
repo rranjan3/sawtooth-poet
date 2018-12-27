@@ -22,6 +22,8 @@ extern crate crypto;
 extern crate hyper;
 extern crate ias_client;
 extern crate lazy_static;
+extern crate sawtooth_sdk;
+extern crate validator_registry_tp;
 #[macro_use]
 extern crate log;
 extern crate log4rs;
@@ -29,16 +31,14 @@ extern crate num;
 extern crate openssl;
 extern crate protobuf;
 extern crate rand;
-extern crate sawtooth_sdk;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate hex;
 extern crate serde_json;
 extern crate sgxffi;
 extern crate toml;
-extern crate validator_registry_tp;
 extern crate zmq;
-extern crate hex;
 
 use engine::Poet2Engine;
 use log::LevelFilter;

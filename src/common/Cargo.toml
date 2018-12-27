@@ -1,0 +1,5 @@
+[package]
+name = "common"
+version = "1.0.0"
+authors = ["Intel Corporation"]
+description = "Common utility library"

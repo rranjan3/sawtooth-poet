@@ -23,10 +23,12 @@ extern crate log;
 extern crate log4rs;
 #[macro_use]
 extern crate serde_derive;
+extern crate common;
 extern crate serde_json;
 extern crate toml;
 
 use clap::{App, Arg};
+use common::utils::read_file_as_string;
 use ias_proxy_config::IasProxyConfig;
 use log::LogLevelFilter;
 use log4rs::{
@@ -35,12 +37,9 @@ use log4rs::{
     encode::pattern::PatternEncoder,
 };
 use std::process;
-use utils::read_file_as_string;
 
 mod ias_proxy_config;
 mod ias_proxy_server;
-mod lru_cache;
-mod utils;
 
 const DEFAULT_CONFIG_FILE: &str = "tests/packaging/ias_proxy.toml";
 const LOG_FILE_PATH: &str = "/var/log/sawtooth-poet/ias-proxy.log";

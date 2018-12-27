@@ -21,14 +21,15 @@ extern crate openssl;
 use ias_client::{client_utils::read_body_as_string, ias_client::IasClient};
 use openssl::pkey::PKey;
 use poet2_util::{
-    read_binary_file, read_file_as_string, sha512_from_str, verify_message_signature,
+    get_cert_and_sig_from, read_binary_file, read_file_as_string, sha512_from_str,
+    verify_message_signature,
 };
 use poet_config::PoetConfig;
+use sawtooth_sdk::consensus::engine::Block;
 use serde_json;
 use serde_json::{from_str, Value};
 use sgxffi::ffi;
 use sgxffi::ffi::r_sgx_enclave_id_t;
-use sgxffi::ffi::r_sgx_epid_group_t;
 use sgxffi::ffi::r_sgx_signup_info_t;
 use sgxffi::ffi::r_sgx_wait_certificate_t;
 use std::env;
@@ -67,6 +68,12 @@ impl Default for WaitCertificate {
     }
 }
 
+impl From<&Block> for WaitCertificate {
+    fn from(block: &Block) -> WaitCertificate {
+        let (wait_certificate, _) = get_cert_and_sig_from(block);
+        serde_json::from_str(&wait_certificate).unwrap()
+    }
+}
 #[derive(Clone)]
 pub struct EnclaveConfig {
     pub enclave_id: r_sgx_enclave_id_t,

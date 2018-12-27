@@ -19,8 +19,7 @@ use std::fs::File;
 use std::io::Read;
 
 /// Utility function to accept file name (with path if present) and return contents of file as
-/// String object. Note that error reading file would panic, because IAS proxy server cannot
-/// function without reading file.
+/// String object. Note that error reading file would panic.
 ///
 /// return: A String object
 pub fn read_file_as_string(file_name: &str) -> String {

@@ -17,7 +17,7 @@ version: "3.6"
 
 services:
 
- poet-engin-1:
+ poet-engine-1:
      build:
        context: .
        dockerfile: poet-sgx-engine.dockerfile
