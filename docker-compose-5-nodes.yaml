@@ -224,7 +224,7 @@ services:
     volumes:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
-      - ./logs1/poet:/project/sawtooth-poet/src/core/log
+      - ./logs1/poet:/var/log/sawtooth-poet
       - poet-share:/poet_keys
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:
@@ -256,7 +256,7 @@ services:
     volumes:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
-      - ./logs2/poet:/project/sawtooth-poet/src/core/log
+      - ./logs2/poet:/var/log/sawtooth-poet
       - poet-share:/poet_keys
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:
@@ -288,7 +288,7 @@ services:
     volumes:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
-      - ./logs3/poet:/project/sawtooth-poet/src/core/log
+      - ./logs3/poet:/var/log/sawtooth-poet
       - poet-share:/poet_keys
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:
@@ -320,7 +320,7 @@ services:
     volumes:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
-      - ./logs4/poet:/project/sawtooth-poet/src/core/log
+      - ./logs4/poet:/var/log/sawtooth-poet
       - poet-share:/poet_keys
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:
@@ -352,7 +352,7 @@ services:
     volumes:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
-      - ./logs5/poet:/project/sawtooth-poet/src/core/log
+      - ./logs5/poet:/var/log/sawtooth-poet
       - poet-share:/poet_keys
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:

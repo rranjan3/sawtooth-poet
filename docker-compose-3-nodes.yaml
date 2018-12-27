@@ -152,7 +152,7 @@ services:
     volumes:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
-      - ./logs1/poet:/project/sawtooth-poet/src/core/log
+      - ./logs1/poet:/var/log/sawtooth-poet
       - poet-share:/poet_keys
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:
@@ -185,7 +185,7 @@ services:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
       - poet-share:/poet_keys
-      - ./logs2/poet:/project/sawtooth-poet/src/core/log
+      - ./logs2/poet:/var/log/sawtooth-poet
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:
       - validator-2
@@ -217,7 +217,7 @@ services:
       - ./:/project/sawtooth-poet/
       - cargo-registry:/root/.cargo/registry
       - poet-share:/poet_keys
-      - ./logs3/poet:/project/sawtooth-poet/src/core/log
+      - ./logs3/poet:/var/log/sawtooth-poet
     working_dir: '/project/sawtooth-poet/src/core'
     depends_on:
       - validator-3
