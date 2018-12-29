@@ -13,3 +13,13 @@ services:
         - http_proxy
         - https_proxy
         - no_proxy
+
+  poet-validator-registry-tp:
+    image: sawtooth-poet-validator-registry-tp:${ISOLATION_ID}
+    build:
+      context: .
+      dockerfile: src/validator-registry-tp/Dockerfile-installed
+      args:
+        - http_proxy
+        - https_proxy
+        - no_proxy

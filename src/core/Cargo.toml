@@ -38,7 +38,7 @@ bincode = "1.0.1"
 common = { path = "../common" }
 ias_client = { path = "../ias_client" }
 rust_sgxffi = { path = "../sgx/rust_sgxffi"}
-validator_registry_tp = { path = "../validator-registry-tp" }
+validator-registry-tp = { path = "../validator-registry-tp" }
 hyper = "0.12.11"
 tokio-core = "0.1.17"
 toml = "0.4.8"

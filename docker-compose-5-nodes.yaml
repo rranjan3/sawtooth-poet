@@ -494,7 +494,7 @@ services:
     depends_on:
       - validator-1
     entrypoint: "bash -c \"\
-        RUST_BACKTRACE=1 cargo run --bin validator_registry_tp -- -vv -C \
+        RUST_BACKTRACE=1 cargo run --bin validator-registry-tp -- -vv -C \
         tcp://validator-1:4004 && \
          tail -f /dev/null \
         \""
@@ -520,7 +520,7 @@ services:
     depends_on:
       - validator-2
     entrypoint: "bash -c \"\
-        RUST_BACKTRACE=1 cargo run --bin validator_registry_tp -- -vv -C \
+        RUST_BACKTRACE=1 cargo run --bin validator-registry-tp -- -vv -C \
         tcp://validator-2:4004 && \
          tail -f /dev/null \
         \""
@@ -546,7 +546,7 @@ services:
     depends_on:
       - validator-3
     entrypoint: "bash -c \"\
-        RUST_BACKTRACE=1 cargo run --bin validator_registry_tp -- -vv -C \
+        RUST_BACKTRACE=1 cargo run --bin validator-registry-tp -- -vv -C \
         tcp://validator-3:4004 && \
          tail -f /dev/null \
         \""
@@ -572,7 +572,7 @@ services:
     depends_on:
       - validator-4
     entrypoint: "bash -c \"\
-        RUST_BACKTRACE=1 cargo run --bin validator_registry_tp -- -vv -C \
+        RUST_BACKTRACE=1 cargo run --bin validator-registry-tp -- -vv -C \
         tcp://validator-4:4004 && \
          tail -f /dev/null \
         \""
@@ -598,7 +598,7 @@ services:
     depends_on:
       - validator-5
     entrypoint: "bash -c \"\
-        RUST_BACKTRACE=1 cargo run --bin validator_registry_tp -- -vv -C \
+        RUST_BACKTRACE=1 cargo run --bin validator-registry-tp -- -vv -C \
         tcp://validator-5:4004 && \
          tail -f /dev/null \
         \""

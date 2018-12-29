@@ -155,7 +155,7 @@ services:
     depends_on:
       - validator-1
     entrypoint: "bash -c \"\
-        RUST_BACKTRACE=1 cargo run --bin validator_registry_tp -- -vv -C \
+        RUST_BACKTRACE=1 cargo run --bin validator-registry-tp -- -vv -C \
         tcp://validator-1:4004 && \
          tail -f /dev/null \
         \""
